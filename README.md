@@ -27,7 +27,7 @@ Usage of mqtt-emulator (flags):
 
 **Конфигурация**
 
-```JSON
+```
 {  
 "mqttserver": {  
     "host": "0.0.0.0",          -сервер для подключения  
