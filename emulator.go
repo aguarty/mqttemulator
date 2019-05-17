@@ -7,6 +7,28 @@ import (
 	"time"
 )
 
+type MetroSensor struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
+	Range struct {
+		Min   int `json:"min"`
+		Max   int `json:"max"`
+		Delta int `json:"delta"`
+		Time  int `json:"time"`
+	} `json:"range"`
+	Alarms struct {
+		Min   bool `json:"min"`
+		Max   bool `json:"max"`
+		Delta bool `json:"delta"`
+	} `json:"alarms"`
+}
+
+type PayloadMetro struct {
+	ID   int           `json:"id"`
+	Time time.Time     `json:"time"`
+	Type []MetroSensor `json:"type"`
+}
+
 //PayloadChan format payload chanel
 type PayloadChan struct {
 	Payload string
@@ -40,6 +62,7 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 
 	case []*DevIrModel:
 		go func() {
+			var cnt int
 			for {
 				rnd := rand.New(crysrc)
 				var chance bool
@@ -63,20 +86,29 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 								if err == nil {
 									v.Data.Value = flo
 								}
-								payload.Payload = fmt.Sprintf(`{"ID":"%d", "time":"%s", "type":"%s", "value":"%.0f"}`, v.Data.ID, time.Now().Format(timeformat), "ir", flo)
+								payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "ir", flo)
+								//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "ir", flo, 0, 1, cfg.Ir.Interval)
 								payload.Type = "ir"
 								c <- payload
 							} else {
 								if rnd.Float64()*100 < ChanceIr {
 									oldval := int(v.Data.Value)
 									v.Data.Value = float64(oldval ^ 1)
-									payload.Payload = fmt.Sprintf(`{"ID":"%d", "time":"%s", "type":"%s", "value":"%.0f"}`, v.Data.ID, v.Data.Time.Format(timeformat), "ir", v.Data.Value)
+									payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, v.Data.Time.Format(timeformat), "ir", v.Data.Value)
+									//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "ir", v.Data.Value, 0, 1, cfg.Ir.Interval)
 									payload.Type = "ir"
 									c <- payload
 								}
 							}
 						}
 						v.Lock.Unlock()
+					}
+				}
+				if *loops != 0 {
+					cnt++
+					if cnt >= *loops {
+						stop <- "IR stop"
+						return
 					}
 				}
 				time.Sleep(time.Millisecond * time.Duration(cfg.Ir.Interval))
@@ -86,6 +118,7 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 	case []*DevTemperatureModel:
 
 		go func() {
+			var cnt int
 			for {
 				for k, v := range DevTemperatureArray {
 					v.Lock.Lock()
@@ -116,10 +149,18 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 						v.Data.Time = time.Now()
 
 						payload.Type = "temperature"
-						payload.Payload = fmt.Sprintf(`{"ID":"%d", "time":"%s", "type":"%s", "value":"%.2f"}`, v.Data.ID, time.Now().Format(timeformat), "temperature", newvalue)
+						payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "temperature", newvalue)
+						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "temperature", v.Data.Value, cfg.Temperature.Range.Low, cfg.Temperature.Range.High, cfg.Temperature.Interval)
 						c <- payload
 					}
 					v.Lock.Unlock()
+				}
+				if *loops != 0 {
+					cnt++
+					if cnt >= *loops {
+						stop <- "Temperature stop"
+						return
+					}
 				}
 				time.Sleep(time.Millisecond * time.Duration(cfg.Temperature.Interval))
 			}
@@ -127,6 +168,7 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 
 	case []*DevLightModel:
 		go func() {
+			var cnt int
 			for {
 				for k, v := range DevLightArray {
 					v.Lock.Lock()
@@ -156,11 +198,19 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 						v.Data.Value = newvalue
 						v.Data.Time = time.Now()
 
-						payload.Payload = fmt.Sprintf(`{"ID":"%d", "time":"%s", "type":"%s", "value":"%.2f"}`, v.Data.ID, time.Now().Format(timeformat), "light", newvalue)
+						payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "light", newvalue)
+						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "light", v.Data.Value, cfg.Light.Range.Low, cfg.Light.Range.High, cfg.Light.Interval)
 						payload.Type = "light"
 						c <- payload
 					}
 					v.Lock.Unlock()
+				}
+				if *loops != 0 {
+					cnt++
+					if cnt >= *loops {
+						stop <- "Light stop"
+						return
+					}
 				}
 				time.Sleep(time.Millisecond * time.Duration(cfg.Light.Interval))
 			}
@@ -168,6 +218,7 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 
 	case []*DevCo2Model:
 		go func() {
+			var cnt int
 			for {
 				for k, v := range DevCo2Array {
 					v.Lock.Lock()
@@ -196,17 +247,24 @@ func Emulate(DevArray interface{}) <-chan PayloadChan {
 						}
 						v.Data.Time = time.Now()
 						v.Data.Value = newvalue
-						payload.Payload = fmt.Sprintf(`{"ID":"%d", "time":"%s", "type":"%s", "value":"%.2f"}`, v.Data.ID, time.Now().Format(timeformat), "co2", newvalue)
+						payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "co2", newvalue)
+						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "co2", v.Data.Value, cfg.Co2.Range.Low, cfg.Co2.Range.High, cfg.Co2.Interval)
 						payload.Type = "co2"
 						c <- payload
 					}
 					v.Lock.Unlock()
+				}
+				if *loops != 0 {
+					cnt++
+					if cnt >= *loops {
+						stop <- "CO2 stop"
+						return
+					}
 				}
 				time.Sleep(time.Millisecond * time.Duration(cfg.Co2.Interval))
 			}
 		}()
 
 	}
-
 	return c
 }

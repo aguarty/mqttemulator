@@ -6,7 +6,11 @@ import (
 )
 
 const (
-	timeformat = "2006-01-02 15:04:05"
+	timeformat      = "2006-01-02 15:04:05"
+	timeformatMetro = time.RFC3339
+
+	dataFormat      = `{"ID":"%d", "time":"%s", "type":"%s", "value":"%.2f"}`
+	dataFormatMetro = `{"id":%d,"time":"%s","type":[{"name":"%s","value":%.2f,"range":{"min":%d,"max":%d,"delta":1,"time":%d},"alarms":{"min":false,"max":false,"delta":false}}]}`
 )
 
 var (
