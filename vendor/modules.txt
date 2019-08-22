@@ -1,0 +1,24 @@
+# github.com/eclipse/paho.mqtt.golang v1.1.1
+github.com/eclipse/paho.mqtt.golang
+github.com/eclipse/paho.mqtt.golang/packets
+# github.com/gdamore/encoding v1.0.0
+github.com/gdamore/encoding
+# github.com/gdamore/tcell v1.1.1
+github.com/gdamore/tcell
+github.com/gdamore/tcell/terminfo
+# github.com/lucasb-eyer/go-colorful v1.0.1
+github.com/lucasb-eyer/go-colorful
+# github.com/mattn/go-runewidth v0.0.4
+github.com/mattn/go-runewidth
+# github.com/rivo/tview v0.0.0-20190324182152-8a9e26fab0ff
+github.com/rivo/tview
+# github.com/rivo/uniseg v0.0.0-20190313204849-f699dde9c340
+github.com/rivo/uniseg
+# golang.org/x/net v0.0.0-20190301231341-16b79f2e4e95
+golang.org/x/net/proxy
+golang.org/x/net/websocket
+golang.org/x/net/internal/socks
+# golang.org/x/text v0.3.0
+golang.org/x/text/encoding
+golang.org/x/text/transform
+golang.org/x/text/encoding/internal/identifier
