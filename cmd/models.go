@@ -13,17 +13,14 @@ const (
 	dataFormatMetro = `{"id":%d,"time":"%s","type":[{"name":"%s","value":%.2f,"range":{"min":%d,"max":%d,"delta":1,"time":%d},"alarms":{"min":false,"max":false,"delta":false}}]}`
 )
 
-var (
-	crysrc cryptoSource
-	cfg    *Config
-
+type storage struct {
+	crysrc              cryptoSource
 	devIrArray          []*devIrModel
 	devTemperatureArray []*devTemperatureModel
 	devLightArray       []*devLightModel
 	devCo2Array         []*devCo2Model
-
-	chanceIr float64
-)
+	chanceIr            float64
+}
 
 type mqttServer struct {
 	Host         string `json:"host"`

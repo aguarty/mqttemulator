@@ -1,3 +1,5 @@
+github.com/aguarty/litelogger v0.0.0-20190823063609-0aa8a74736d3 h1:PjfyBzCgOpBEBOTh9NCiuAhnTlAEdJd8GdDlRKwqXY4=
+github.com/aguarty/litelogger v0.0.0-20190823063609-0aa8a74736d3/go.mod h1:p6Y8p5AO2xes3vPUpT6J4QQ7S8UhcwqLHtD2TCI2dHY=
 github.com/eclipse/paho.mqtt.golang v1.1.1 h1:iPJYXJLaViCshRTW/PSqImSS6HJ2Rf671WR0bXZ2GIU=
 github.com/eclipse/paho.mqtt.golang v1.1.1/go.mod h1:H9keYFcgq3Qr5OUJm/JZI/i6U7joQ8SYLhZwfeOo6Ts=
 github.com/gdamore/encoding v1.0.0 h1:+7OoQ1Bc6eTm5niUzBa0Ctsh6JbMW6Ra+YNuAtDBdko=

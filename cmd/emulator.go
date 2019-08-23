@@ -54,7 +54,7 @@ func withTimeCorrection() float64 {
 }
 
 //Emulate - emulating data
-func emulate(devArray interface{}) <-chan payloadChan {
+func (a *appEmulator) emulate(devArray interface{}) <-chan payloadChan {
 
 	c := make(chan payloadChan)
 
@@ -64,16 +64,16 @@ func emulate(devArray interface{}) <-chan payloadChan {
 		go func() {
 			var cnt int
 			for {
-				rnd := rand.New(crysrc)
+				rnd := rand.New(a.devs.crysrc)
 				var chance bool
-				if cfg.Ir.All == "" {
-					chance = rnd.Intn(100) > 100-cfg.Ir.Chance
+				if a.cfg.Ir.All == "" {
+					chance = rnd.Intn(100) > 100-a.cfg.Ir.Chance
 				} else {
 					chance = true
 				}
 				if chance {
 
-					for k, v := range devIrArray {
+					for k, v := range a.devs.devIrArray {
 						v.Lock.Lock()
 						payload := payloadChan{}
 						payload.ID = k
@@ -81,21 +81,21 @@ func emulate(devArray interface{}) <-chan payloadChan {
 						if v.Enabled {
 							v.Data.Time = time.Now()
 
-							if cfg.Ir.All != "" {
-								flo, err := strconv.ParseFloat(cfg.Ir.All, 64)
+							if a.cfg.Ir.All != "" {
+								flo, err := strconv.ParseFloat(a.cfg.Ir.All, 64)
 								if err == nil {
 									v.Data.Value = flo
 								}
 								payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "ir", flo)
-								//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "ir", flo, 0, 1, cfg.Ir.Interval)
+								//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "ir", flo, 0, 1, a.cfg.Ir.Interval)
 								payload.Type = "ir"
 								c <- payload
 							} else {
-								if rnd.Float64()*100 < chanceIr {
+								if rnd.Float64()*100 < a.devs.chanceIr {
 									oldval := int(v.Data.Value)
 									v.Data.Value = float64(oldval ^ 1)
 									payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, v.Data.Time.Format(timeformat), "ir", v.Data.Value)
-									//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "ir", v.Data.Value, 0, 1, cfg.Ir.Interval)
+									//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "ir", v.Data.Value, 0, 1, a.cfg.Ir.Interval)
 									payload.Type = "ir"
 									c <- payload
 								}
@@ -107,11 +107,13 @@ func emulate(devArray interface{}) <-chan payloadChan {
 				if *loops != 0 {
 					cnt++
 					if cnt >= *loops {
-						stop <- "IR stop"
+						a.Lock()
+						a.stop <- "IR stop"
+						a.Unlock()
 						return
 					}
 				}
-				time.Sleep(time.Millisecond * time.Duration(cfg.Ir.Interval))
+				time.Sleep(time.Millisecond * time.Duration(a.cfg.Ir.Interval))
 			}
 		}()
 
@@ -120,15 +122,15 @@ func emulate(devArray interface{}) <-chan payloadChan {
 		go func() {
 			var cnt int
 			for {
-				for k, v := range devTemperatureArray {
+				for k, v := range a.devs.devTemperatureArray {
 					v.Lock.Lock()
 					if v.Enabled {
 						payload := payloadChan{}
 						payload.ID = k
-						rnd := rand.New(crysrc)
+						rnd := rand.New(a.devs.crysrc)
 						oldval := v.Data.Value
 						var newvalue float64
-						if rnd.Intn(100) > 100-cfg.Temperature.Chance {
+						if rnd.Intn(100) > 100-a.cfg.Temperature.Chance {
 							if rnd.Intn(100) > v.Balance {
 								newvalue = (oldval + (rnd.Float64()+withTimeCorrection())*v.Correction)
 								if newvalue >= float64(v.Range.High) {
@@ -150,7 +152,7 @@ func emulate(devArray interface{}) <-chan payloadChan {
 
 						payload.Type = "temperature"
 						payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "temperature", newvalue)
-						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "temperature", v.Data.Value, cfg.Temperature.Range.Low, cfg.Temperature.Range.High, cfg.Temperature.Interval)
+						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "temperature", v.Data.Value, a.cfg.Temperature.Range.Low, a.cfg.Temperature.Range.High, a.cfg.Temperature.Interval)
 						c <- payload
 					}
 					v.Lock.Unlock()
@@ -158,11 +160,13 @@ func emulate(devArray interface{}) <-chan payloadChan {
 				if *loops != 0 {
 					cnt++
 					if cnt >= *loops {
-						stop <- "Temperature stop"
+						a.Lock()
+						a.stop <- "Temperature stop"
+						a.Unlock()
 						return
 					}
 				}
-				time.Sleep(time.Millisecond * time.Duration(cfg.Temperature.Interval))
+				time.Sleep(time.Millisecond * time.Duration(a.cfg.Temperature.Interval))
 			}
 		}()
 
@@ -170,15 +174,15 @@ func emulate(devArray interface{}) <-chan payloadChan {
 		go func() {
 			var cnt int
 			for {
-				for k, v := range devLightArray {
+				for k, v := range a.devs.devLightArray {
 					v.Lock.Lock()
 					if v.Enabled {
 						payload := payloadChan{}
 						payload.ID = k
-						rnd := rand.New(crysrc)
+						rnd := rand.New(a.devs.crysrc)
 						oldval := v.Data.Value
 						var newvalue float64
-						if rnd.Intn(100) > 100-cfg.Light.Chance {
+						if rnd.Intn(100) > 100-a.cfg.Light.Chance {
 							if rnd.Intn(100) > v.Balance {
 								newvalue = (oldval + (rnd.Float64()+withTimeCorrection())*v.Correction)
 								if newvalue > float64(v.Range.High) {
@@ -199,7 +203,7 @@ func emulate(devArray interface{}) <-chan payloadChan {
 						v.Data.Time = time.Now()
 
 						payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "light", newvalue)
-						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "light", v.Data.Value, cfg.Light.Range.Low, cfg.Light.Range.High, cfg.Light.Interval)
+						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "light", v.Data.Value, a.cfg.Light.Range.Low, a.cfg.Light.Range.High, a.cfg.Light.Interval)
 						payload.Type = "light"
 						c <- payload
 					}
@@ -208,11 +212,13 @@ func emulate(devArray interface{}) <-chan payloadChan {
 				if *loops != 0 {
 					cnt++
 					if cnt >= *loops {
-						stop <- "Light stop"
+						a.Lock()
+						a.stop <- "Light stop"
+						a.Unlock()
 						return
 					}
 				}
-				time.Sleep(time.Millisecond * time.Duration(cfg.Light.Interval))
+				time.Sleep(time.Millisecond * time.Duration(a.cfg.Light.Interval))
 			}
 		}()
 
@@ -220,15 +226,15 @@ func emulate(devArray interface{}) <-chan payloadChan {
 		go func() {
 			var cnt int
 			for {
-				for k, v := range devCo2Array {
+				for k, v := range a.devs.devCo2Array {
 					v.Lock.Lock()
 					if v.Enabled {
 						payload := payloadChan{}
 						payload.ID = k
-						rnd := rand.New(crysrc)
+						rnd := rand.New(a.devs.crysrc)
 						oldval := v.Data.Value
 						var newvalue float64
-						if rnd.Intn(100) > 100-cfg.Co2.Chance {
+						if rnd.Intn(100) > 100-a.cfg.Co2.Chance {
 							if rnd.Intn(100) > v.Balance {
 								newvalue = (oldval + (rnd.Float64()+withTimeCorrection())*v.Correction)
 								if newvalue > float64(v.Range.High) {
@@ -248,7 +254,7 @@ func emulate(devArray interface{}) <-chan payloadChan {
 						v.Data.Time = time.Now()
 						v.Data.Value = newvalue
 						payload.Payload = fmt.Sprintf(dataFormat, v.Data.ID, time.Now().Format(timeformat), "co2", newvalue)
-						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "co2", v.Data.Value, cfg.Co2.Range.Low, cfg.Co2.Range.High, cfg.Co2.Interval)
+						//payload.Payload = fmt.Sprintf(dataFormatMetro, v.Data.ID, time.Now().Format(timeformatMetro), "co2", v.Data.Value, a.cfg.Co2.Range.Low, a.cfg.Co2.Range.High, a.cfg.Co2.Interval)
 						payload.Type = "co2"
 						c <- payload
 					}
@@ -257,11 +263,13 @@ func emulate(devArray interface{}) <-chan payloadChan {
 				if *loops != 0 {
 					cnt++
 					if cnt >= *loops {
-						stop <- "CO2 stop"
+						a.Lock()
+						a.stop <- "CO2 stop"
+						a.Unlock()
 						return
 					}
 				}
-				time.Sleep(time.Millisecond * time.Duration(cfg.Co2.Interval))
+				time.Sleep(time.Millisecond * time.Duration(a.cfg.Co2.Interval))
 			}
 		}()
 

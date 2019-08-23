@@ -6,27 +6,23 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strconv"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
-func loadConfig() {
+func (a *appEmulator) loadConfig() *Config {
 	file, err := ioutil.ReadFile("config.cfg")
 	if err != nil {
-		log.Println("open config error: ", err)
+		a.logger.Info("open config error: ", err)
 	}
-	cfg = &Config{}
+	cfg := &Config{}
 	if err = json.Unmarshal(file, cfg); err != nil {
-		log.Fatal("parse config error: ", err)
+		a.logger.Fatal("parse config error: ", err)
 	}
-	if err := validateConfig(); err != nil {
-		log.Fatal(err.Error())
-	}
+	return cfg
 }
 
 //block for unique random
@@ -41,34 +37,34 @@ func (s cryptoSource) Int63() int64 {
 func (s cryptoSource) Uint64() (v uint64) {
 	err := binary.Read(crand.Reader, binary.BigEndian, &v)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	return v
 }
 
 //validateConfig check config
-func validateConfig() error {
-	if cfg.Co2.Range.Low >= cfg.Co2.Range.High || cfg.Co2.Count < cfg.Co2.Overflowcount {
+func (a *appEmulator) validateConfig() error {
+	if a.cfg.Co2.Range.Low >= a.cfg.Co2.Range.High || a.cfg.Co2.Count < a.cfg.Co2.Overflowcount {
 		return errors.New("CO2 range failed")
 	}
-	if cfg.Temperature.Range.Low >= cfg.Temperature.Range.High || cfg.Temperature.Count < cfg.Temperature.Overflowcount {
+	if a.cfg.Temperature.Range.Low >= a.cfg.Temperature.Range.High || a.cfg.Temperature.Count < a.cfg.Temperature.Overflowcount {
 		return errors.New("Temperature range failed")
 	}
-	if cfg.Light.Range.Low >= cfg.Light.Range.High || cfg.Light.Count < cfg.Light.Overflowcount {
+	if a.cfg.Light.Range.Low >= a.cfg.Light.Range.High || a.cfg.Light.Count < a.cfg.Light.Overflowcount {
 		return errors.New("Light range failed")
 	}
-	if cfg.Ir.Chance > 100 {
+	if a.cfg.Ir.Chance > 100 {
 		return errors.New("Chance over 100%")
 	}
 	return nil
 }
 
 //validateCommand validate command
-func validateCommand(c *controlCommand) error {
+func (a *appEmulator) validateCommand(c *controlCommand) error {
 
 	switch c.Type {
 	case "co2":
-		if c.ID > cfg.Co2.Count-1 || len(devCo2Array) == 0 {
+		if c.ID > a.cfg.Co2.Count-1 || len(a.devs.devCo2Array) == 0 {
 			return errors.New("CO2 device ID does not exist")
 		}
 		switch c.Cmd {
@@ -87,7 +83,7 @@ func validateCommand(c *controlCommand) error {
 			if err != nil {
 				return errors.New("CO2 Balance parse command failed")
 			}
-			if tmpval < 0 || tmpval >= devCo2Array[c.ID].Range.High {
+			if tmpval < 0 || tmpval >= a.devs.devCo2Array[c.ID].Range.High {
 				return errors.New("CO2 Balance in out of range")
 			}
 		case "rangeHigh":
@@ -95,7 +91,7 @@ func validateCommand(c *controlCommand) error {
 			if err != nil {
 				return errors.New("CO2 Balance parse command failed")
 			}
-			if tmpval <= devCo2Array[c.ID].Range.Low {
+			if tmpval <= a.devs.devCo2Array[c.ID].Range.Low {
 				return errors.New("CO2 Balance in out of range")
 			}
 		case "chance":
@@ -110,7 +106,7 @@ func validateCommand(c *controlCommand) error {
 			return errors.New("CO2 command failed")
 		}
 	case "light":
-		if c.ID > cfg.Light.Count-1 || len(devLightArray) == 0 {
+		if c.ID > a.cfg.Light.Count-1 || len(a.devs.devLightArray) == 0 {
 			return errors.New("Light device ID does not exist")
 		}
 		switch c.Cmd {
@@ -129,7 +125,7 @@ func validateCommand(c *controlCommand) error {
 			if err != nil {
 				return errors.New("Light Balance parse command failed")
 			}
-			if tmpval < 0 || tmpval >= devLightArray[c.ID].Range.High {
+			if tmpval < 0 || tmpval >= a.devs.devLightArray[c.ID].Range.High {
 				return errors.New("Light Balance in out of range")
 			}
 		case "rangeHigh":
@@ -137,8 +133,8 @@ func validateCommand(c *controlCommand) error {
 			if err != nil {
 				return errors.New("Light Balance parse command failed")
 			}
-			fmt.Println(devLightArray[c.ID].Range.Low)
-			if tmpval <= devLightArray[c.ID].Range.Low {
+			a.logger.Info(a.devs.devLightArray[c.ID].Range.Low)
+			if tmpval <= a.devs.devLightArray[c.ID].Range.Low {
 				return errors.New("Light Balance in out of range")
 			}
 		case "chance":
@@ -153,7 +149,7 @@ func validateCommand(c *controlCommand) error {
 			return errors.New("Light command failed")
 		}
 	case "temperature":
-		if c.ID > cfg.Temperature.Count-1 || len(devTemperatureArray) == 0 {
+		if c.ID > a.cfg.Temperature.Count-1 || len(a.devs.devTemperatureArray) == 0 {
 			return errors.New("Temperature device ID does not exist")
 		}
 		switch c.Cmd {
@@ -172,7 +168,7 @@ func validateCommand(c *controlCommand) error {
 			if err != nil {
 				return errors.New("Temperature Balance parse command failed")
 			}
-			if tmpval < 0 || tmpval >= devTemperatureArray[c.ID].Range.High {
+			if tmpval < 0 || tmpval >= a.devs.devTemperatureArray[c.ID].Range.High {
 				return errors.New("Temperature Balance in out of range")
 			}
 		case "rangeHigh":
@@ -180,7 +176,7 @@ func validateCommand(c *controlCommand) error {
 			if err != nil {
 				return errors.New("Temperature Balance parse command failed")
 			}
-			if tmpval <= devTemperatureArray[c.ID].Range.Low {
+			if tmpval <= a.devs.devTemperatureArray[c.ID].Range.Low {
 				return errors.New("Temperature Balance in out of range")
 			}
 		case "chance":
@@ -195,7 +191,7 @@ func validateCommand(c *controlCommand) error {
 			return errors.New("Temperature command failed")
 		}
 	case "ir":
-		if c.ID > cfg.Ir.Count-1 || len(devIrArray) == 0 {
+		if c.ID > a.cfg.Ir.Count-1 || len(a.devs.devIrArray) == 0 {
 			return errors.New("IR device ID does not exist")
 		}
 	}
@@ -203,8 +199,8 @@ func validateCommand(c *controlCommand) error {
 }
 
 //InitMqttReaderClient initialize connection to mqtt-server
-func initMqttReaderClient() MQTT.Client {
-	server := "tcp://" + cfg.Mqttserver.Host + ":" + cfg.Mqttserver.Port
+func (a *appEmulator) initMqttReaderClient() {
+	server := "tcp://" + a.cfg.Mqttserver.Host + ":" + a.cfg.Mqttserver.Port
 
 	connOpts := MQTT.NewClientOptions()
 	connOpts.AddBroker(server)
@@ -214,19 +210,18 @@ func initMqttReaderClient() MQTT.Client {
 	connOpts.SetPassword("")
 	connOpts.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 
-	client := MQTT.NewClient(connOpts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatal(token.Error())
+	a.readerClient = MQTT.NewClient(connOpts)
+	if token := a.readerClient.Connect(); token.Wait() && token.Error() != nil {
+		a.logger.Fatal(token.Error())
 		os.Exit(0)
 	}
 
-	log.Println("Reader connected to server:", server)
-	return client
+	a.logger.Info("Reader connected to server:", server)
 }
 
 //InitMqttBrokerClient initialize connection to mqtt-server
-func initMqttBrokerClient() MQTT.Client {
-	server := "tcp://" + cfg.Mqttserver.Host + ":" + cfg.Mqttserver.Port
+func (a *appEmulator) initMqttBrokerClient() {
+	server := "tcp://" + a.cfg.Mqttserver.Host + ":" + a.cfg.Mqttserver.Port
 
 	connOpts := MQTT.NewClientOptions()
 	connOpts.AddBroker(server)
@@ -236,33 +231,31 @@ func initMqttBrokerClient() MQTT.Client {
 	connOpts.SetPassword("")
 	connOpts.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 
-	client := MQTT.NewClient(connOpts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatal(token.Error())
+	a.brockerClient = MQTT.NewClient(connOpts)
+	if token := a.brockerClient.Connect(); token.Wait() && token.Error() != nil {
+		a.logger.Fatal(token.Error())
 		os.Exit(0)
 	}
-
-	log.Println("Brocker connected to server:", server)
-	return client
+	a.logger.Info("Brocker connected to server:", server)
 }
 
 //RunCommandReader read commands from topic
 // {"type":"light", "id":1, "cmd":"enabled", "value":"true"}
-func runCommandReader(readerClient MQTT.Client) {
+func (a *appEmulator) runCommandReader() {
 	for {
-		readerClient.Subscribe(cfg.Mqttserver.CommandTopic, 0, func(readerClient MQTT.Client, msg MQTT.Message) {
+		a.readerClient.Subscribe(a.cfg.Mqttserver.CommandTopic, 0, func(client MQTT.Client, msg MQTT.Message) {
 			cmd := &controlCommand{}
 			if err := json.Unmarshal(msg.Payload(), cmd); err == nil {
-				if err := validateCommand(cmd); err == nil {
+				if err := a.validateCommand(cmd); err == nil {
 					switch cmd.Type {
 					case "ir":
 						switch cmd.Cmd {
 						case "enabled":
 							tmpval, err := strconv.ParseBool(cmd.Value)
 							if err == nil {
-								devIrArray[cmd.ID].Lock.Lock()
-								devIrArray[cmd.ID].Enabled = tmpval
-								devIrArray[cmd.ID].Lock.Unlock()
+								a.devs.devIrArray[cmd.ID].Lock.Lock()
+								a.devs.devIrArray[cmd.ID].Enabled = tmpval
+								a.devs.devIrArray[cmd.ID].Lock.Unlock()
 							}
 						}
 					case "co2":
@@ -270,37 +263,37 @@ func runCommandReader(readerClient MQTT.Client) {
 						case "enabled":
 							tmpval, err := strconv.ParseBool(cmd.Value)
 							if err == nil {
-								devCo2Array[cmd.ID].Lock.Lock()
-								devCo2Array[cmd.ID].Enabled = tmpval
-								devCo2Array[cmd.ID].Lock.Unlock()
+								a.devs.devCo2Array[cmd.ID].Lock.Lock()
+								a.devs.devCo2Array[cmd.ID].Enabled = tmpval
+								a.devs.devCo2Array[cmd.ID].Lock.Unlock()
 							}
 						case "balance":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devCo2Array[cmd.ID].Lock.Lock()
-								devCo2Array[cmd.ID].Balance = tmpval
-								devCo2Array[cmd.ID].Lock.Unlock()
+								a.devs.devCo2Array[cmd.ID].Lock.Lock()
+								a.devs.devCo2Array[cmd.ID].Balance = tmpval
+								a.devs.devCo2Array[cmd.ID].Lock.Unlock()
 							}
 						case "rangeLow":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devCo2Array[cmd.ID].Lock.Lock()
-								devCo2Array[cmd.ID].Range.Low = tmpval
-								devCo2Array[cmd.ID].Lock.Unlock()
+								a.devs.devCo2Array[cmd.ID].Lock.Lock()
+								a.devs.devCo2Array[cmd.ID].Range.Low = tmpval
+								a.devs.devCo2Array[cmd.ID].Lock.Unlock()
 							}
 						case "rangeHigh":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devCo2Array[cmd.ID].Lock.Lock()
-								devCo2Array[cmd.ID].Range.High = tmpval
-								devCo2Array[cmd.ID].Lock.Unlock()
+								a.devs.devCo2Array[cmd.ID].Lock.Lock()
+								a.devs.devCo2Array[cmd.ID].Range.High = tmpval
+								a.devs.devCo2Array[cmd.ID].Lock.Unlock()
 							}
 						case "chance":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devCo2Array[cmd.ID].Lock.Lock()
-								devCo2Array[cmd.ID].Chance = tmpval
-								devCo2Array[cmd.ID].Lock.Unlock()
+								a.devs.devCo2Array[cmd.ID].Lock.Lock()
+								a.devs.devCo2Array[cmd.ID].Chance = tmpval
+								a.devs.devCo2Array[cmd.ID].Lock.Unlock()
 							}
 						}
 					case "light":
@@ -308,38 +301,38 @@ func runCommandReader(readerClient MQTT.Client) {
 						case "enabled":
 							tmpval, err := strconv.ParseBool(cmd.Value)
 							if err == nil {
-								devLightArray[cmd.ID].Lock.Lock()
-								devLightArray[cmd.ID].Enabled = tmpval
-								devLightArray[cmd.ID].Lock.Unlock()
+								a.devs.devLightArray[cmd.ID].Lock.Lock()
+								a.devs.devLightArray[cmd.ID].Enabled = tmpval
+								a.devs.devLightArray[cmd.ID].Lock.Unlock()
 							}
 						case "balance":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devLightArray[cmd.ID].Lock.Lock()
-								devLightArray[cmd.ID].Balance = tmpval
-								devLightArray[cmd.ID].Lock.Unlock()
+								a.devs.devLightArray[cmd.ID].Lock.Lock()
+								a.devs.devLightArray[cmd.ID].Balance = tmpval
+								a.devs.devLightArray[cmd.ID].Lock.Unlock()
 							}
 						case "rangeLow":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devLightArray[cmd.ID].Lock.Lock()
-								devLightArray[cmd.ID].Range.Low = tmpval
-								devLightArray[cmd.ID].Lock.Unlock()
-								fmt.Println(devLightArray[cmd.ID].Range.Low)
+								a.devs.devLightArray[cmd.ID].Lock.Lock()
+								a.devs.devLightArray[cmd.ID].Range.Low = tmpval
+								a.devs.devLightArray[cmd.ID].Lock.Unlock()
+								a.logger.Info(a.devs.devLightArray[cmd.ID].Range.Low)
 							}
 						case "rangeHigh":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devLightArray[cmd.ID].Lock.Lock()
-								devLightArray[cmd.ID].Range.High = tmpval
-								devLightArray[cmd.ID].Lock.Unlock()
+								a.devs.devLightArray[cmd.ID].Lock.Lock()
+								a.devs.devLightArray[cmd.ID].Range.High = tmpval
+								a.devs.devLightArray[cmd.ID].Lock.Unlock()
 							}
 						case "chance":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devLightArray[cmd.ID].Lock.Lock()
-								devLightArray[cmd.ID].Chance = tmpval
-								devLightArray[cmd.ID].Lock.Unlock()
+								a.devs.devLightArray[cmd.ID].Lock.Lock()
+								a.devs.devLightArray[cmd.ID].Chance = tmpval
+								a.devs.devLightArray[cmd.ID].Lock.Unlock()
 							}
 						}
 					case "temperature":
@@ -347,46 +340,46 @@ func runCommandReader(readerClient MQTT.Client) {
 						case "enabled":
 							tmpval, err := strconv.ParseBool(cmd.Value)
 							if err == nil {
-								devTemperatureArray[cmd.ID].Lock.Lock()
-								devTemperatureArray[cmd.ID].Enabled = tmpval
-								devTemperatureArray[cmd.ID].Lock.Unlock()
+								a.devs.devTemperatureArray[cmd.ID].Lock.Lock()
+								a.devs.devTemperatureArray[cmd.ID].Enabled = tmpval
+								a.devs.devTemperatureArray[cmd.ID].Lock.Unlock()
 							}
 						case "balance":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devTemperatureArray[cmd.ID].Lock.Lock()
-								devTemperatureArray[cmd.ID].Balance = tmpval
-								devTemperatureArray[cmd.ID].Lock.Unlock()
+								a.devs.devTemperatureArray[cmd.ID].Lock.Lock()
+								a.devs.devTemperatureArray[cmd.ID].Balance = tmpval
+								a.devs.devTemperatureArray[cmd.ID].Lock.Unlock()
 							}
 						case "rangeLow":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devTemperatureArray[cmd.ID].Lock.Lock()
-								devTemperatureArray[cmd.ID].Range.Low = tmpval
-								devTemperatureArray[cmd.ID].Lock.Unlock()
+								a.devs.devTemperatureArray[cmd.ID].Lock.Lock()
+								a.devs.devTemperatureArray[cmd.ID].Range.Low = tmpval
+								a.devs.devTemperatureArray[cmd.ID].Lock.Unlock()
 							}
 						case "rangeHigh":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devTemperatureArray[cmd.ID].Lock.Lock()
-								devTemperatureArray[cmd.ID].Range.High = tmpval
-								devTemperatureArray[cmd.ID].Lock.Unlock()
+								a.devs.devTemperatureArray[cmd.ID].Lock.Lock()
+								a.devs.devTemperatureArray[cmd.ID].Range.High = tmpval
+								a.devs.devTemperatureArray[cmd.ID].Lock.Unlock()
 							}
 						case "chance":
 							tmpval, err := strconv.Atoi(cmd.Value)
 							if err == nil {
-								devTemperatureArray[cmd.ID].Lock.Lock()
-								devTemperatureArray[cmd.ID].Chance = tmpval
-								devTemperatureArray[cmd.ID].Lock.Unlock()
+								a.devs.devTemperatureArray[cmd.ID].Lock.Lock()
+								a.devs.devTemperatureArray[cmd.ID].Chance = tmpval
+								a.devs.devTemperatureArray[cmd.ID].Lock.Unlock()
 							}
 						}
 					}
-					log.Printf("GET: %s \n", msg.Payload())
+					a.logger.Infof("GET: %s \n", msg.Payload())
 				} else {
-					log.Println("error parse command: ", err)
+					a.logger.Info("error parse command: ", err)
 				}
 			} else {
-				log.Println("error parse command: ", err)
+				a.logger.Info("error parse command: ", err)
 			}
 		})
 
@@ -394,13 +387,13 @@ func runCommandReader(readerClient MQTT.Client) {
 }
 
 //RunWrapEmulator wrapper around emulator
-func runWrapEmulator(brockerClient MQTT.Client, DevArray interface{}) {
-	for payload := range emulate(DevArray) {
-		brockerClient.Publish(cfg.Mqttserver.Topic+"/"+payload.Type+"/"+strconv.Itoa(payload.ID), byte(0), false, payload.Payload)
+func (a *appEmulator) runWrapEmulator(DevArray interface{}) {
+	for payload := range a.emulate(DevArray) {
+		a.brockerClient.Publish(a.cfg.Mqttserver.Topic+"/"+payload.Type+"/"+strconv.Itoa(payload.ID), byte(0), false, payload.Payload)
 		if *gui && *clog {
-			GuiLog <- payload.Payload
+			a.guiLog <- payload.Payload
 		} else if *clog {
-			log.Printf("PUSH %s\n", payload.Payload)
+			a.logger.Infof("PUSH %s\n", payload.Payload)
 		}
 	}
 }
